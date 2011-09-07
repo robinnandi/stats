@@ -1,0 +1,16 @@
+Limit Setting Code
+
+Uses RooFit and RooStats in pyROOT version 5.30.00.
+
+To run: python limit.py
+
+Methods:
+- "profileLikelihood": Profile Likelihood Ratio with Wilks theorem to get the
+  confidence interval.
+- "feldmanCousins": Neyman Construction with Profile Likelihood Ratio as a test
+  statistic.
+- "cls": Step through possible values of parameter of interest and throw MC toys
+  with hypothesis testing to get a confidence interval.
+
+Confidence Level:
+- Can be changed. 0.95 by default.
