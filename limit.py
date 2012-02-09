@@ -1,8 +1,9 @@
 import ROOT as r
 import array
+import math
 import plotting as plotting
 from runInverter import RunInverter
-from inputData import inputData
+#from inputData import inputData
 
 def wimport(w, item) :
     r.RooMsgService.instance().setGlobalKillBelow(r.RooFit.WARNING) #suppress info messages
@@ -14,39 +15,72 @@ def setupLikelihood(w, inputData, smOnly) :
     obs = []
     nuis = []
     poi = []
-    wimport(w, r.RooRealVar("f", "f", 0.1, 0.0, 1.0))
-    wimport(w, r.RooRealVar("xsec", "xsec", inputData.CrossSection + 0.1*inputData.CrossSectionError, inputData.CrossSection - 3*inputData.CrossSectionError, inputData.CrossSection + 3*inputData.CrossSectionError))
+    wimport(w, r.RooRealVar("f", "f", 0.1, 0., 2.))
+    wimport(w, r.RooRealVar("xsec", "xsec", inputData.CrossSection, inputData.CrossSection - 3*inputData.CrossSectionError, inputData.CrossSection + 3*inputData.CrossSectionError))
     wimport(w, r.RooRealVar("xsec_mu", "xsec_mu", inputData.CrossSection))
     wimport(w, r.RooRealVar("xsec_sig", "xsec_sig", inputData.CrossSectionError))
     wimport(w, r.RooGaussian("gaus_xsec", "gaus_xsec", w.function("xsec"), w.var("xsec_mu"), w.var("xsec_sig")))
-    wimport(w, r.RooRealVar("lumi", "lumi", inputData.Lumi + 0.1*inputData.LumiError, inputData.Lumi - 3*inputData.LumiError, inputData.Lumi + 3*inputData.LumiError))
+    wimport(w, r.RooRealVar("lumi", "lumi", inputData.Lumi, inputData.Lumi - 3*inputData.LumiError, inputData.Lumi + 3*inputData.LumiError))
     wimport(w, r.RooRealVar("lumi_mu", "lumi_mu", inputData.Lumi))
     wimport(w, r.RooRealVar("lumi_sig", "lumi_sig", inputData.LumiError))
     wimport(w, r.RooGaussian("gaus_lumi", "gaus_lumi", w.function("lumi"), w.var("lumi_mu"), w.var("lumi_sig")))
+    n_nonzero_terms = 0
     for i in range(inputData.nBins) :
-        wimport(w, r.RooRealVar("n_%d"%i, "n_%d"%i, inputData.Observation[i]))
-        wimport(w, r.RooRealVar("b_%d"%i, "b_%d"%i, inputData.Background[i] + 0.1*inputData.BackgroundError[i], inputData.Background[i] - 3*inputData.BackgroundError[i], inputData.Background[i] + 3*inputData.BackgroundError[i]))
-        wimport(w, r.RooRealVar("b_mu_%d"%i, "b_mu_%d"%i, inputData.Background[i]))
-        wimport(w, r.RooRealVar("b_sig_%d"%i, "b_sig_%d"%i, inputData.BackgroundError[i]))
-        wimport(w, r.RooGaussian("gaus_b_%d"%i, "gaus_b_%d"%i, w.function("b_%d"%i), w.var("b_mu_%d"%i), w.var("b_sig_%d"%i)))
-        wimport(w, r.RooRealVar("eff_%d"%i, "eff_%d"%i, inputData.SignalEfficiency[i]))
-        wimport(w, r.RooProduct("s_%d"%i, "s_%d"%i, r.RooArgSet(w.var("eff_%d"%i), w.var("lumi"), w.var("xsec"), w.var("f"))))
+        e = 1e-4
+        try : 
+            pois_b = inputData.Background[i]**inputData.Observation[i] * math.e**(-inputData.Background[i]) / math.factorial(int(inputData.Observation[i]))
+        except OverflowError :
+            pois_b = 0
+        try : 
+            exp = inputData.Background[i] + inputData.SignalEfficiency[i]*inputData.Lumi*inputData.CrossSection
+            pois_s = exp**inputData.Observation[i] * math.e**(-exp) / math.factorial(int(inputData.Observation[i]))
+        except OverflowError :
+            pois_s = 0
+        if (pois_b > e and pois_s > e and inputData.CrossSection > 0) :
+            #print i
+            #print pois_b
+            #print pois_s
+            wimport(w, r.RooRealVar("n_%d"%i, "n_%d"%i, inputData.Observation[i]))
+            wimport(w, r.RooRealVar("b_%d"%i, "b_%d"%i, inputData.Background[i], inputData.Background[i] - 3*inputData.BackgroundError[i], inputData.Background[i] + 3*inputData.BackgroundError[i]))
+            wimport(w, r.RooRealVar("b_mu_%d"%i, "b_mu_%d"%i, inputData.Background[i]))
+            wimport(w, r.RooRealVar("b_sig_%d"%i, "b_sig_%d"%i, inputData.BackgroundError[i]))
+            wimport(w, r.RooGaussian("gaus_b_%d"%i, "gaus_b_%d"%i, w.function("b_%d"%i), w.var("b_mu_%d"%i), w.var("b_sig_%d"%i)))
+            wimport(w, r.RooRealVar("eff_%d"%i, "eff_%d"%i, inputData.SignalEfficiency[i]))
+            wimport(w, r.RooProduct("s_%d"%i, "s_%d"%i, r.RooArgSet(w.var("eff_%d"%i), w.var("lumi"), w.var("xsec"), w.var("f"))))
+            if smOnly :
+                wimport(w, r.RooPoisson("pois_%d"%i, "pois_%d"%i, w.var("n_%d"%i), w.var("b_%d"%i)))
+            else :
+                wimport(w, r.RooAddition("exp_%d"%i, "exp_%d"%i, r.RooArgSet(w.function("b_%d"%i), w.function("s_%d"%i))))
+                wimport(w, r.RooPoisson("pois_%d"%i, "pois_%d"%i, w.var("n_%d"%i), w.function("exp_%d"%i)))
+
+            terms.append("pois_%d"%i)
+            terms.append("gaus_b_%d"%i)
+            obs.append("n_%d"%i)
+            nuis.append("b_%d"%i)
+
+            n_nonzero_terms = n_nonzero_terms + 1
+
+    if (n_nonzero_terms == 0) :
+        # set up a dummy likelihood
+        wimport(w, r.RooRealVar("n", "n", 1))
+        wimport(w, r.RooRealVar("b", "b", 2))
+        wimport(w, r.RooRealVar("s", "s", 10))
+        wimport(w, r.RooProduct("t", "t", r.RooArgSet(w.var("f"), w.var("s"))))
         if smOnly :
-            wimport(w, r.RooPoisson("pois_%d"%i, "pois_%d"%i, w.var("n_%d"%i), w.var("b_%d"%i)))
+            wimport(w, r.RooPoisson("pois", "pois", w.var("n"), w.var("b")))
         else :
-            wimport(w, r.RooAddition("exp_%d"%i, "exp_%d"%i, r.RooArgSet(w.function("b_%d"%i), w.function("s_%d"%i))))
-            wimport(w, r.RooPoisson("pois_%d"%i, "pois_%d"%i, w.var("n_%d"%i), w.function("exp_%d"%i)))
+            wimport(w, r.RooAddition("exp", "exp", r.RooArgSet(w.function("b"), w.function("t"))))
+            wimport(w, r.RooPoisson("pois", "pois", w.var("n"), w.function("exp")))
+        terms.append("pois")
+        obs.append("n")
+        poi.append("f")
+    else :
+        terms.append("gaus_xsec")
+        terms.append("gaus_lumi")
+        nuis.append("xsec")
+        nuis.append("lumi")
 
-        terms.append("pois_%d"%i)
-        terms.append("gaus_b_%d"%i)
-        obs.append("n_%d"%i)
-        nuis.append("b_%d"%i)
-    terms.append("gaus_xsec")
-    terms.append("gaus_lumi")
-    nuis.append("xsec")
-    nuis.append("lumi")
-
-    poi.append("f")
+        poi.append("f")
 
     w.factory("PROD::model(%s)"%",".join(terms))
 
@@ -89,7 +123,7 @@ def oneGraph(n = None, b = None, npoints = None, poimin = None, poimax = None) :
 
     return gr
 
-def plInterval(dataset, modelconfig, wspace, cl = 0.95, makePlots = True) :
+def plInterval(dataset, modelconfig, wspace, cl = 0.95, makePlots = True, note = "") :
     out = {}
     calc = r.RooStats.ProfileLikelihoodCalculator(dataset, modelconfig, 1.-cl)
     lInt = calc.GetInterval()
@@ -100,12 +134,13 @@ def plInterval(dataset, modelconfig, wspace, cl = 0.95, makePlots = True) :
         canvas = r.TCanvas()
         canvas.SetTickx()
         canvas.SetTicky()
-        filename = "intervalPlot_%g"%(100*cl)
+        filename = "intervalPlot_%g_%s"%(100*cl, note)
         plot = r.RooStats.LikelihoodIntervalPlot(lInt)
         plot.SetMaximum(3.)
         plot.Draw()
-        canvas.SaveAs(filename+".eps")
-        #canvas.SaveAs(filename+".png")
+        canvas.SaveAs("plots/"+filename+".eps")
+        canvas.SaveAs("plots/"+filename+".png")
+        canvas.SaveAs("plots/"+filename+".pdf")
 
     return out
 
@@ -253,17 +288,18 @@ def expectedLimit(dataset, modelConfig, wspace, smOnly, cl, method, nToys, plusM
     return q,nSuccesses
 
 class foo(object) :
-    def __init__(self) :
+    def __init__(self, inputData) :
         r.gROOT.SetBatch(True)
         r.RooRandom.randomGenerator().SetSeed(1)
+        self.inputData = inputData
         self.wspace = r.RooWorkspace("workspace")
-        setupLikelihood(self.wspace, inputData, smOnly = False)
+        setupLikelihood(self.wspace, self.inputData, smOnly = False)
         self.data = dataset(self.wspace.set("obs"))
         self.modelConfig = modelConfiguration(self.wspace)
 
-    def observedLimit(self, cl = 0.95, method = "profileLikelihood", makePlots = True) :
+    def observedLimit(self, cl = 0.95, method = "profileLikelihood", makePlots = True, note = "") :
         if method == "profileLikelihood" :
-            return plInterval(self.data, self.modelConfig, self.wspace, cl = cl, makePlots = makePlots)
+            return plInterval(self.data, self.modelConfig, self.wspace, cl = cl, makePlots = makePlots, note = note)
         elif method == "feldmanCousins" : 
             return fcExcl(self.data, self.modelConfig, self.wspace, cl = cl, makePlots = makePlots)
         elif method == "cls" :
@@ -271,15 +307,15 @@ class foo(object) :
         else :
             print "Method not recognised. Must be \"profileLikelihood\", \"feldmanCousins\" or \"cls\"."
 
-    def expectedLimit(self, cl = 0.95, method = "profileLikelihood", makePlots = True) :
-        return expectedLimit(self.data, self.modelConfig, self.wspace, smOnly = False, cl = cl, method = method, nToys = 1000, plusMinus = {}, makePlots = makePlots)
+    def expectedLimit(self, cl = 0.95, method = "profileLikelihood", makePlots = True, note = "") :
+        return expectedLimit(self.data, self.modelConfig, self.wspace, smOnly = False, cl = cl, method = method, nToys = 100, plusMinus = {"OneSigma" : 1}, note = note, makePlots = makePlots)
 
 
-f = foo()
-out = f.observedLimit(0.95, "profileLikelihood", True)
+#f = foo(inputData)
+#out = f.observedLimit(0.95, "profileLikelihood", True)
 #out = f.observedLimit(0.95, "feldmanCousins", True)
 #out = f.observedLimit(0.95, "cls", True)
 #print "Upper Limit = "+str(out["UpperLimit"])
 #print "Lower Limit = "+str(out["LowerLimit"])
 #out = f.expectedLimit(0.95, "profileLikelihood", True)
-print out
+#print out

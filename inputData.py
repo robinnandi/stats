@@ -8,8 +8,8 @@ inputData = PSet(
     SignalEfficiency = [0.5],
     SignalEfficiencyPlusError = [0.05],
     SignalEfficiencyMinusError = [0.02],
-    Lumi = 1100.,
-    LumiError = 44.,
-    CrossSection = 35.,
-    CrossSectionError = 3.5,
+    Lumi = 100.,
+    LumiError = 0.4,
+    CrossSection = 1.,
+    CrossSectionError = 0.1,
 )

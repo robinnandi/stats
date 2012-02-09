@@ -1,4 +1,4 @@
-# One bin; poisson likelihood; CLs, Profile Likelihood and Feldman Cousins.
+# One bin; poisson likelihood; no systematic errors; CLs, Profile Likelihood and Feldman Cousins.
 
 import ROOT as r
 from runInverter import RunInverter
@@ -160,5 +160,5 @@ class foo(object) :
 f = foo()
 #out = f.cls()
 #out = f.interval()
-out = f.interval(0.95, "feldmanCousins", True)
+out = f.interval(0.95, "profileLikelihood", True)
 print out

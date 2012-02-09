@@ -2,14 +2,16 @@ import ROOT as r
 import copy
 
 def expectedLimitPlots(quantiles = {}, hist = None, obsLimit = None, note = "") :
-    filename = "limits_%s.eps"%note
+    filename = "limits_%s"%note
     canvas = r.TCanvas("canvas")
     canvas.SetTickx()
     canvas.SetTicky()
 
     l = drawDecoratedHisto(quantiles, hist, obsLimit)
 
-    canvas.Print(filename)
+    canvas.Print("plots/"+filename+".eps")
+    canvas.Print("plots/"+filename+".png")
+    canvas.Print("plots/"+filename+".pdf")
 
 def drawDecoratedHisto(quantiles = {}, hist = None, obs = None) :
     hist.Draw()
