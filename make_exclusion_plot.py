@@ -41,6 +41,21 @@ def GetContour(a):
             min_ix.append((ix, i))
     return min_ix
 
+def Smooth(a):
+    smoothed_array = []
+    for i in range(len(a)):
+        smoothed_array.append((0, 0))
+    i = 0
+    for i in range(len(a)):
+        if i != 0 and i != 1 and i != len(a)-2 and i != len(a)-1:
+            smoothed_array[i] = ( 1.0*(a[i-2][0] + a[i-1][0] + a[i][0] + a[i+1][0] +
+a[i+2][0])/5, 1.0*(a[i-2][1] + a[i-1][1] + a[i][1] + a[i+1][1] +
+a[i+2][1])/5 )
+        else:
+            smoothed_array[i] = a[i]
+        i = i + 1
+    return smoothed_array
+
 # Extract numbers from the file, make an array and plot histograms
 f = open("results.txt", "r")
 obs_array = [[0 for i in range(21)] for j in range(21)]
@@ -86,6 +101,7 @@ for i in range(201):
 
 # Get contours and make graphs
 cont_obs = GetContour(a_obs)
+cont_obs = Smooth(cont_obs)
 #cont_obs.sort()
 x_obs = array.array("d", [])
 y_obs = array.array("d", [])
@@ -93,8 +109,10 @@ for (p, q) in cont_obs:
     x_obs.append(400 + 8*p)
     y_obs.append(400 + 8*q)
 graph_obs = r.TGraph(len(cont_obs), x_obs, y_obs)
+graph_obs.SetName("graph_obs")
 graph_obs.SetLineWidth(3)
 cont_exp = GetContour(a_exp)
+cont_exp = Smooth(cont_exp)
 #cont_exp.sort()
 x_exp = array.array("d", [])
 y_exp = array.array("d", [])
@@ -102,6 +120,7 @@ for (p, q) in cont_exp:
     x_exp.append(400 + 8*p)
     y_exp.append(400 + 8*q)
 graph_exp = r.TGraph(len(cont_exp), x_exp, y_exp)
+graph_exp.SetName("graph_exp")
 graph_exp.SetLineColor(3)
 graph_exp.SetMarkerColor(3)
 graph_exp.SetLineWidth(3)
@@ -116,11 +135,13 @@ for (p, q) in cont_upper:
     x_upper.append(400 + 8*p)
     y_upper.append(400 + 8*q)
 graph_upper = r.TGraph(len(cont_upper), x_upper, y_upper)
+graph_upper.SetName("graph_upper")
 graph_upper.SetLineColor(4)
 graph_upper.SetMarkerColor(4)
 graph_upper.SetFillColor(0)
 graph_upper.SetLineWidth(1002)
 cont_lower = GetContour(a_lower)
+cont_lower = Smooth(cont_lower)
 #cont_lower.sort()
 x_lower = array.array("d", [])
 y_lower = array.array("d", [])
@@ -128,10 +149,26 @@ for (p, q) in cont_lower:
     x_lower.append(400 + 8*p)
     y_lower.append(400 + 8*q)
 graph_lower = r.TGraph(len(cont_lower), x_lower, y_lower)
+graph_lower.SetName("graph_lower")
 graph_lower.SetLineColor(4)
 graph_lower.SetMarkerColor(4)
 graph_lower.SetFillColor(4)
 graph_lower.SetLineWidth(2002)
+# RA3 limit 
+cont_ra3 = [(700, 1900), (700, 1800), (700, 1700), (700, 1600), (700, 1500),
+(720, 1400), (730, 1300), (750, 1200), (780, 1100), (930, 1000), (1000, 960),
+(1100, 920), (1200, 920), (1300, 920), (1400, 920), (1500, 920), (1600, 920),
+(1700, 920), (1800, 920), (1900, 920)]
+x_ra3 = array.array("d", [])
+y_ra3 = array.array("d", [])
+for (p, q) in cont_ra3:
+    x_ra3.append(p)
+    y_ra3.append(q)
+graph_ra3 = r.TGraph(len(cont_ra3), x_ra3, y_ra3)
+graph_ra3.SetName("graph_ra3")
+graph_ra3.SetLineColor(2)
+graph_ra3.SetMarkerColor(2)
+graph_ra3.SetLineWidth(2)
 
 # Draw Graphs
 c = r.TCanvas("c", "c", 1000, 1000)
@@ -140,9 +177,16 @@ multigraph.Add(graph_lower)
 multigraph.Add(graph_upper)
 multigraph.Add(graph_exp)
 multigraph.Add(graph_obs)
+multigraph.Add(graph_ra3)
 multigraph.Draw("apl")
 multigraph.GetXaxis().SetLimits(600., 1900.)
 multigraph.GetYaxis().SetRangeUser(600., 1900.)
+leg = r.TLegend(0.7, 0.7, 0.9, 0.9)
+leg.AddEntry("graph_obs", "Observed Limit", "l")
+leg.AddEntry("graph_exp", "Expected Limit", "l")
+leg.AddEntry("graph_lower", "#pm 1#sigma band", "f")
+leg.AddEntry("graph_ra3", "RA3 exclusion", "l")
+leg.Draw()
 c.SaveAs("graph.pdf")
 
 # Draw histograms
